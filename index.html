@@ -287,7 +287,7 @@ td.num,th.num{text-align:right;font-family:var(--mono)}
   </section>
 
   <section class="view" id="v-b2b">
-    <div class="panel"><div class="ph"><div><h2>B2B Partner Prospecting</h2><div class="muted">Weekly outreach — emails, calls, WhatsApp — with response rate, meetings and deals. Updated weekly.</div></div></div>
+    <div class="panel"><div class="ph"><div><h2>B2B Partner Prospecting</h2><div class="muted">Partner CRM — international email cadence + US market. Live from database.</div></div></div>
       <div id="b2bBody"></div></div>
   </section>
 
@@ -601,71 +601,75 @@ function renderCampTable(){
 }
 function renderProspecting(){
   var body=document.getElementById('b2bBody'); if(!body)return;
-  var PR=DATA.prospecting||{}, E=PR.email, weeks=PR.weeks||[];
+  var B=DATA.b2b;
+  if(!B){ body.innerHTML='<div class="muted">No partner data yet.</div>'; return; }
   var h='';
-  if(E&&E.campaigns&&E.campaigns.length){
-    var C=E.campaigns, S=function(k){return C.reduce(function(s,c){return s+(+c[k]||0);},0);};
-    var sent=S('sent'),deliv=S('delivered'),opens=S('opens'),clicks=S('clicks'),unsub=S('unsub');
-    var k=[['Campaigns',C.length,''],['Emails sent',sent.toLocaleString('en-US'),''],['Delivered',_pct(deliv,sent).toFixed(1)+'%',''],
-           ['Open rate',_pct(opens,deliv).toFixed(1)+'%','g'],['Click rate',_pct(clicks,deliv).toFixed(1)+'%','g'],
-           ['Click-to-open',_pct(clicks,opens).toFixed(1)+'%',''],['Unsubscribes',unsub,'']];
-    h+='<div class="muted" style="margin-bottom:10px">Brevo email campaigns · '+(E.range||'')+'</div>';
-    h+='<div class="kpis" style="grid-template-columns:repeat(7,1fr);margin-bottom:16px">'+
-       k.map(function(x){return '<div class="kpi"><div class="lbl">'+x[0]+'</div><div class="val '+x[2]+'">'+x[1]+'</div></div>';}).join('')+'</div>';
-    var reg={}; C.forEach(function(c){var r=reg[c.region]=reg[c.region]||{n:0,sent:0,deliv:0,opens:0,clicks:0,unsub:0};r.n++;r.sent+=c.sent;r.deliv+=c.delivered;r.opens+=c.opens;r.clicks+=c.clicks;r.unsub+=c.unsub;});
-    var regs=Object.keys(reg).map(function(nm){var r=reg[nm];return{name:nm,n:r.n,sent:r.sent,deliv:r.deliv,openR:_pct(r.opens,r.deliv),clickR:_pct(r.clicks,r.deliv)};}).sort(function(a,b){return b.clickR-a.clickR;});
-    var maxClick=Math.max.apply(null,regs.map(function(r){return r.clickR;}).concat([1]));
-    h+='<div class="ins-grid"><div class="panel"><h2>Performance by market</h2><div class="muted" style="margin-bottom:10px">Sorted by click rate — who engages most</div>'+
-       '<div style="overflow-x:auto"><table><thead><tr><th>Market</th><th class="num">Camp.</th><th class="num">Sent</th><th class="num">Deliv.</th><th class="num">Open%</th><th class="num">Click%</th></tr></thead><tbody>'+
-       regs.map(function(r){return '<tr><td>'+r.name+'</td><td class="num">'+r.n+'</td><td class="num">'+r.sent.toLocaleString('en-US')+'</td><td class="num">'+r.deliv.toLocaleString('en-US')+'</td><td class="num">'+r.openR.toFixed(1)+'%</td><td class="num" style="color:var(--gold-br)">'+r.clickR.toFixed(1)+'%</td></tr>';}).join('')+
-       '</tbody></table></div></div>'+
-       '<div class="panel"><h2>Click rate by market</h2><div style="margin-top:12px">'+
-       regs.map(function(r){return '<div class="hbar"><div class="nm">'+r.name+'</div><div class="tr"><i style="width:'+(r.clickR/maxClick*100)+'%"></i></div><div class="vv">'+r.clickR.toFixed(1)+'%</div></div>';}).join('')+
-       '<div class="muted" style="margin-top:12px;font-size:11.5px">Open rate = unique opens ÷ delivered · Click rate = unique clicks ÷ delivered · Delivered ÷ sent shows list quality.</div></div></div>';
-    h+='<div class="panel" style="margin-top:14px"><h2 style="margin:0 0 4px">All campaigns</h2><div class="muted" style="margin-bottom:12px">Click a column to sort</div><div style="overflow-x:auto"><table id="campTable"></table></div></div>';
+  var pctReplied=B.total?(B.replied/B.total*100):0;
+  var pctContacted=B.total?(B.contacted/B.total*100):0;
+
+  h+='<div class="muted" style="margin-bottom:10px">Partner base — international cold outreach (email cadence) + US market (personal outreach)</div>';
+  var k=[['Total partners',B.total.toLocaleString('en-US'),''],
+         ['International',B.intl.toLocaleString('en-US'),''],
+         ['United States',B.us.toLocaleString('en-US'),''],
+         ['Signed',B.signed,'g'],
+         ['Interested',B.interested,'g'],
+         ['Contacted',B.contacted.toLocaleString('en-US'),''],
+         ['Total touches',B.totalTouches.toLocaleString('en-US'),'']];
+  h+='<div class="kpis" style="grid-template-columns:repeat(7,1fr);margin-bottom:16px">'+
+     k.map(function(x){return '<div class="kpi"><div class="lbl">'+x[0]+'</div><div class="val '+x[2]+'">'+x[1]+'</div></div>';}).join('')+'</div>';
+
+  // Status funnel + Country breakdown
+  var statusOrder=['signed','interested','contacted','new','not_interested','no_email'];
+  var statusLabel={signed:'Signed',interested:'Interested',contacted:'Contacted',new:'Queued (new)',not_interested:'Not interested',no_email:'No email'};
+  var st=B.byStatus||{};
+  var stKeys=statusOrder.filter(function(s){return st[s];}).concat(Object.keys(st).filter(function(s){return statusOrder.indexOf(s)<0;}));
+  var smax=Math.max.apply(null,stKeys.map(function(s){return st[s];}).concat([1]));
+
+  var co=B.byCountry||{};
+  var coKeys=Object.keys(co).sort(function(a,b){return co[b]-co[a];});
+  var cmax=Math.max.apply(null,coKeys.map(function(c){return co[c];}).concat([1]));
+
+  h+='<div class="ins-grid"><div class="panel"><h2>Status funnel</h2><div style="margin-top:12px">'+
+     stKeys.map(function(s){return '<div class="hbar"><div class="nm">'+(statusLabel[s]||s)+'</div><div class="tr"><i style="width:'+(st[s]/smax*100)+'%"></i></div><div class="vv">'+st[s]+'</div></div>';}).join('')+
+     '</div></div>'+
+     '<div class="panel"><h2>By country</h2><div style="margin-top:12px">'+
+     coKeys.map(function(c){return '<div class="hbar"><div class="nm">'+c+'</div><div class="tr"><i style="width:'+(co[c]/cmax*100)+'%"></i></div><div class="vv">'+co[c]+'</div></div>';}).join('')+
+     '</div></div></div>';
+
+  // Type breakdown
+  var ty=B.byType||{};
+  var tyKeys=Object.keys(ty).sort(function(a,b){return ty[b]-ty[a];});
+  if(tyKeys.length){
+    h+='<div class="panel" style="margin-top:14px"><h2>By type</h2><div class="kpis" style="grid-template-columns:repeat('+Math.min(tyKeys.length,6)+',1fr);margin-top:12px">'+
+       tyKeys.map(function(t){return '<div class="kpi"><div class="lbl">'+t+'</div><div class="val">'+ty[t]+'</div></div>';}).join('')+'</div></div>';
   }
-  var G=PR.gabby;
-  if(G){
-    var conv=G.contacts?(G.signed/G.contacts*100):0;
-    h+='<div style="margin-top:26px;border-top:1px solid var(--line2);padding-top:20px"></div>';
-    h+='<div class="muted" style="margin-bottom:10px">Partner outreach — sales agent '+G.agent+' · '+G.date_range+'</div>';
-    var gk=[['Contacts',G.contacts,''],['Signed partners',G.signed,'g'],['Conversion',conv.toFixed(1)+'%','g'],['In pipeline',G.interested_plus,''],['Hotels prospected',G.hotels_total,'']];
-    h+='<div class="kpis" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">'+
-       gk.map(function(x){return '<div class="kpi"><div class="lbl">'+x[0]+'</div><div class="val '+x[2]+'">'+x[1]+'</div></div>';}).join('')+'</div>';
-    var fmax=Math.max.apply(null,G.funnel.map(function(f){return f[1];}).concat([1]));
-    h+='<div class="ins-grid"><div class="panel"><h2>Pipeline</h2><div style="margin-top:12px">'+
-       G.funnel.map(function(f){return '<div class="hbar"><div class="nm">'+f[0]+'</div><div class="tr"><i style="width:'+(f[1]/fmax*100)+'%"></i></div><div class="vv">'+f[1]+'</div></div>';}).join('')+'</div></div>';
-    h+='<div class="panel"><h2>Channel → conversion</h2><div class="muted" style="margin-bottom:8px">Signed ÷ contacts, by channel — where effort pays off</div>'+
-       '<div style="overflow-x:auto"><table><thead><tr><th>Channel</th><th class="num">Contacts</th><th class="num">Signed</th><th class="num">Conv.</th></tr></thead><tbody>'+
-       G.channels.map(function(c){return '<tr><td>'+c[0]+'</td><td class="num">'+c[1]+'</td><td class="num">'+c[2]+'</td><td class="num" style="color:var(--gold-br)">'+(c[1]?c[2]/c[1]*100:0).toFixed(1)+'%</td></tr>';}).join('')+
-       '</tbody></table></div></div></div>';
-    var pmax=Math.max.apply(null,G.priorities.map(function(p){return p[1];}).concat([1]));
-    var mmax=Math.max.apply(null,G.monthly.map(function(m){return m[1];}).concat([1]));
-    h+='<div class="ins-grid" style="margin-top:14px"><div class="panel"><h2>Priority → conversion</h2>'+
-       '<div style="overflow-x:auto"><table><thead><tr><th>Priority</th><th class="num">Contacts</th><th class="num">Signed</th><th class="num">Conv.</th></tr></thead><tbody>'+
-       G.priorities.map(function(p){return '<tr><td>'+p[0]+'</td><td class="num">'+p[1]+'</td><td class="num">'+p[2]+'</td><td class="num" style="color:var(--gold-br)">'+(p[1]?p[2]/p[1]*100:0).toFixed(1)+'%</td></tr>';}).join('')+
-       '</tbody></table></div></div>'+
-       '<div class="panel"><h2>Outreach activity by month</h2><div class="monthcols" style="margin-top:10px">'+
-       G.monthly.map(function(m){return '<div class="c"><div class="cv">'+m[1]+'</div><div class="bb" style="height:'+(m[1]/mmax*100)+'%"></div><div class="cl">'+m[0]+'</div></div>';}).join('')+
-       '</div></div></div>';
-    h+='<div class="panel" style="margin-top:14px"><h2 style="margin:0 0 4px">Signed partners ('+G.signed+')</h2><div class="muted" style="margin-bottom:12px">The wins — active referral partners</div>'+
-       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">'+
-       G.signed_list.map(function(s){return '<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:9px;padding:11px 13px"><div style="color:var(--gold-br);font-weight:600;font-size:13px">'+s.name+'</div><div class="muted" style="font-size:11px;margin-top:3px">'+[s.title,s.company].filter(Boolean).join(' · ')+'</div></div>';}).join('')+
-       '</div></div>';
-  }
-  if(weeks.length){
-    var owk=function(w){return (+w.emails||0)+(+w.calls||0)+(+w.whatsapp||0);};
-    var rwk=function(w){var o=owk(w);return o?(+w.responses||0)/o*100:0;};
-    h+='<div class="panel" style="margin-top:14px"><h2 style="margin:0 0 12px">Weekly call &amp; WhatsApp outreach</h2><div style="overflow-x:auto"><table>'+
-       '<thead><tr><th>Week</th><th class="num">Emails</th><th class="num">Calls</th><th class="num">WhatsApp</th><th class="num">Responses</th><th class="num">Resp. rate</th><th class="num">Meetings</th><th class="num">Deals</th></tr></thead><tbody>'+
-       weeks.map(function(w){return '<tr><td>'+(w.label||'')+'</td><td class="num">'+(+w.emails||0)+'</td><td class="num">'+(+w.calls||0)+'</td><td class="num">'+(+w.whatsapp||0)+'</td><td class="num">'+(+w.responses||0)+'</td><td class="num" style="color:var(--gold-br)">'+rwk(w).toFixed(1)+'%</td><td class="num">'+(+w.meetings||0)+'</td><td class="num">'+(+w.deals||0)+'</td></tr>';}).join('')+
-       '</tbody></table></div></div>';
-  } else {
-    h+='<div class="muted" style="margin-top:14px">Call &amp; WhatsApp outreach: send me weekly numbers (calls, WhatsApp, responses, meetings, deals) and I\u2019ll track them alongside the email campaigns.</div>';
-  }
-  if(!h) h='<div class="muted">No prospecting data yet.</div>';
+
+  // Partner list with filter
+  var L=B.list||[];
+  h+='<div class="panel" style="margin-top:14px"><h2 style="margin:0 0 4px">All partners ('+L.length.toLocaleString('en-US')+')</h2>'+
+     '<div class="muted" style="margin-bottom:12px">Full CRM — company, contact, country, type, status</div>'+
+     '<input id="b2bSearch" placeholder="Search company, email, country..." style="width:100%;padding:9px 12px;margin-bottom:12px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:13px">'+
+     '<div style="overflow-x:auto"><table id="b2bTable"><thead><tr><th>Company</th><th>Email</th><th>Phone</th><th>Country</th><th>Type</th><th>Status</th><th class="num">Touches</th></tr></thead><tbody id="b2bRows"></tbody></table></div></div>';
+
   body.innerHTML=h;
-  if(E&&E.campaigns&&E.campaigns.length) renderCampTable();
+
+  var statusColor={signed:'#37d67a',interested:'var(--gold-br)',contacted:'#8be3ff',new:'#c9c9d4',not_interested:'#e8735a',no_email:'#8e8e9c'};
+  function drawRows(filter){
+    filter=(filter||'').toLowerCase();
+    var rows=L.filter(function(p){
+      if(!filter)return true;
+      return [p.company,p.email,p.phone,p.country,p.type,p.status].join(' ').toLowerCase().indexOf(filter)>=0;
+    });
+    var tb=document.getElementById('b2bRows');
+    tb.innerHTML=rows.slice(0,400).map(function(p){
+      var col=statusColor[p.status]||'#c9c9d4';
+      return '<tr><td>'+(p.company||'')+'</td><td class="muted">'+(p.email||'')+'</td><td class="muted">'+(p.phone||'')+'</td><td class="muted">'+(p.country||'')+'</td><td class="muted">'+(p.type||'')+'</td><td><span style="color:'+col+';font-weight:600">'+(p.status||'')+'</span></td><td class="num">'+(p.touches||0)+'</td></tr>';
+    }).join('');
+    if(rows.length>400){tb.innerHTML+='<tr><td colspan="7" class="muted" style="text-align:center;padding:10px">Showing first 400 of '+rows.length.toLocaleString('en-US')+' — use search to narrow</td></tr>';}
+  }
+  drawRows('');
+  var si=document.getElementById('b2bSearch');
+  if(si) si.oninput=function(){drawRows(si.value);};
 }
 function exportPayload(){const out={fleet:DATA.fleet,sheet:DATA.sheet,unmatched:DATA.unmatched,orphans:DATA.orphans,generated:DATA.generated,prospecting:DATA.prospecting,
   rentals:DATA.rentals.map(r=>({ag:r.ag,cust:r.cust,plate:r.plate,plate_raw:r.plate_raw,match:r.match,start:r.start,end:r.end,total:r.total,net:r.net,fees:r.fees,ref:r.ref,country:r.country,delivery:r.delivery,pickup:r.pickup,phone:r.phone,email:r.email,broker:r.broker,broker_email:r.broker_email,broker_commission:r.broker_commission,broker_rate:r.broker_rate,broker_address:r.broker_address,broker_ein:r.broker_ein,notes:r.notes,payment:r.payment}))};
