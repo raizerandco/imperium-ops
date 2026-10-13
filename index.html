@@ -793,7 +793,7 @@ if(MODE==='operational'){
   ['v-fin','v-brk','v-b2b'].forEach(id=>{var e=document.getElementById(id); if(e) e.remove();});
   var hdr=document.querySelector('header.top'); if(hdr) hdr.remove();
   var wr=document.querySelector('.wrap'); if(wr) wr.style.paddingTop='12px';
-  var nv=document.querySelector('nav.tabs'); if(nv) nv.style.margin='0 0 14px';
+    var nv=document.querySelector('nav.tabs'); if(nv) nv.style.display='none';
   addEventListener('pageshow',function(e){ if(e.persisted) showCalendar(); });
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) showCalendar(); });
 }else{
